@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instagram Grid Preview</title>
+<style>
+:root {
+  --bg: #FDFCFB;
+  --bg2: #F5F2EE;
+  --bg3: #EDE8E1;
+  --border: #E0DBD4;
+  --text: #2C2A27;
+  --text2: #6B5F52;
+  --text3: #9E9891;
+  --accent: #A89A8A;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+.app { max-width: 960px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; }
+
+/* Header */
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 10px; }
+.header-left h1 { font-size: 18px; font-weight: 500; }
+.header-left p { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn { font-size: 12px; padding: 6px 14px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: var(--bg); color: var(--text2); cursor: pointer; transition: background .15s; white-space: nowrap; }
+.btn:hover { background: var(--bg2); }
+.btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn-primary:hover { background: #444441; }
+.btn-danger { color: #A32D2D; border-color: #f0d0d0; }
+.btn-danger:hover { background: #fff0f0; }
+.saved-note { font-size: 11px; color: #3B6D11; }
+
+/* Profile bar */
+.profile-bar { display: flex; align-items: center; gap: 16px; padding: 1rem 1.25rem; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 1rem; }
+.avatar { width: 52px; height: 52px; border-radius: 50%; background: var(--bg2); border: 0.5px solid var(--border); overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 11px; cursor: pointer; position: relative; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-hint { position: absolute; font-size: 9px; text-align: center; color: var(--text3); pointer-events: none; }
+.profile-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.profile-info input { font-size: 15px; font-weight: 500; border: none; background: transparent; color: var(--text); padding: 0; }
+.profile-info input:focus { outline: none; border-bottom: 1px solid var(--border); }
+.profile-info input.handle { font-size: 12px; font-weight: 400; color: var(--text3); }
+.profile-stats { display: flex; gap: 20px; }
+.pstat { text-align: center; }
+.pstat-num { font-size: 15px; font-weight: 500; }
+.pstat-label { font-size: 11px; color: var(--text3); }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; border-bottom: 0.5px solid var(--border); margin-bottom: 1.25rem; }
+.tab { font-size: 12px; padding: 8px 16px; border: none; background: none; color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -0.5px; transition: color .15s; }
+.tab.active { color: var(--text); border-bottom-color: var(--text); font-weight: 500; }
+
+/* Grid */
+.grid-section { display: none; }
+.grid-section.active { display: block; }
+.ig-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-bottom: 1.5rem; }
+.grid-cell { position: relative; aspect-ratio: 1; background: var(--bg2); border-radius: 2px; overflow: hidden; cursor: grab; transition: transform .15s, opacity .15s; }
+.grid-cell:active { cursor: grabbing; }
+.grid-cell.dragging { opacity: .5; transform: scale(.97); }
+.grid-cell.drag-over { transform: scale(1.02); outline: 2px solid var(--accent); outline-offset: -2px; }
+.grid-cell img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.grid-cell .placeholder { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--text3); font-size: 11px; background: var(--bg2); cursor: pointer; }
+.placeholder-icon { font-size: 22px; line-height: 1; }
+.grid-cell .overlay { position: absolute; inset: 0; background: rgba(44,42,39,0); transition: background .2s; display: flex; align-items: flex-end; pointer-events: none; }
+.grid-cell:hover .overlay { background: rgba(44,42,39,0.55); pointer-events: auto; }
+.overlay-content { padding: 8px; width: 100%; opacity: 0; transition: opacity .2s; }
+.grid-cell:hover .overlay-content { opacity: 1; }
+.overlay-caption { font-size: 10px; color: #fff; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cell-actions { position: absolute; top: 4px; right: 4px; display: none; gap: 3px; z-index: 10; }
+.grid-cell:hover .cell-actions { display: flex; }
+.cell-btn { font-size: 9px; padding: 3px 6px; border-radius: 3px; border: none; cursor: pointer; font-weight: 500; }
+.cell-btn-edit { background: rgba(255,255,255,0.9); color: var(--text); }
+.cell-btn-del { background: rgba(255,255,255,0.9); color: #A32D2D; }
+.status-badge { position: absolute; top: 4px; left: 4px; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 500; }
+.status-live { background: #e2ede0; color: #3B6D11; }
+.status-scheduled { background: #e8e4fa; color: #534AB7; }
+.status-draft { background: var(--bg3); color: var(--text3); }
+.status-idea { background: #faeeda; color: #633806; }
+.cell-num { position: absolute; bottom: 4px; right: 6px; font-size: 9px; color: rgba(255,255,255,0.7); font-weight: 500; display: none; }
+.grid-cell:hover .cell-num { display: block; }
+
+/* Post editor panel */
+.editor-panel { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; display: none; }
+.editor-panel.open { display: block; }
+.editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.editor-header h3 { font-size: 14px; font-weight: 500; }
+.editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 11px; color: var(--text3); font-weight: 500; }
+.field input, .field textarea, .field select { font-size: 13px; padding: 7px 10px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); width: 100%; }
+.field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--accent); }
+.field textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+.field-full { grid-column: 1 / -1; }
+.editor-preview { width: 100%; aspect-ratio: 1; background: var(--bg2); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 8px; border: 0.5px solid var(--border); }
+.editor-preview img { width: 100%; height: 100%; object-fit: cover; }
+.editor-preview .empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 12px; }
+
+/* List section */
+.post-list { display: flex; flex-direction: column; gap: 8px; }
+.post-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-sm); }
+.post-thumb { width: 44px; height: 44px; border-radius: 4px; background: var(--bg2); overflow: hidden; flex-shrink: 0; }
+.post-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.post-thumb .empty-thumb { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--text3); }
+.post-info { flex: 1; min-width: 0; }
+.post-title-text { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.post-meta-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.post-date { font-size: 11px; color: var(--text3); }
+.post-actions { display: flex; gap: 6px; }
+
+/* Colour picker */
+.color-section { background: var(--bg2); border-radius: var(--radius-sm); padding: 1rem; margin-bottom: 1.5rem; }
+.color-section h4 { font-size: 12px; font-weight: 500; margin-bottom: 10px; color: var(--text2); }
+.color-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.color-field { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.color-field label { font-size: 10px; color: var(--text3); text-align: center; }
+.color-field input[type="color"] { width: 36px; height: 36px; border: 0.5px solid var(--border); border-radius: 6px; padding: 2px; background: var(--bg); cursor: pointer; }
+.color-field input[type="text"] { width: 70px; font-size: 10px; padding: 3px 5px; border: 0.5px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-family: monospace; text-align: center; }
+
+/* Instructions */
+.instructions { background: var(--bg2); border-radius: var(--radius-sm); padding: 1rem; font-size: 12px; color: var(--text2); line-height: 1.7; }
+.instructions strong { color: var(--text); }
+.instructions ol { padding-left: 1.2rem; margin-top: 6px; }
+.instructions li { margin-bottom: 4px; }
+
+/* Drag hint */
+.drag-hint { font-size: 11px; color: var(--text3); text-align: center; margin-bottom: 8px; }
+
+@media (max-width: 600px) {
+  .editor-grid { grid-template-columns: 1fr; }
+  .profile-stats { gap: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="header-left">
+      <h1>Instagram Grid Preview</h1>
+      <p>Plan, preview and rearrange your feed — drag to reorder</p>
+    </div>
+    <div class="header-actions">
+      <span class="saved-note" id="saved-note" style="display:none">Saved</span>
+      <button class="btn" onclick="addPost()">+ Add post</button>
+      <button class="btn btn-primary" onclick="saveAll()">Save grid</button>
+    </div>
+  </div>
+
+  <!-- Profile bar -->
+  <div class="profile-bar">
+    <div class="avatar" onclick="document.getElementById('avatar-input').click()" title="Click to change profile photo">
+      <img id="avatar-img" src="" alt="" style="display:none">
+      <span class="avatar-hint" id="avatar-hint">Photo</span>
+      <input id="avatar-input" type="text" style="display:none" placeholder="Image URL">
+    </div>
+    <div class="profile-info">
+      <input id="profile-name" value="Your Name" placeholder="Your Name">
+      <input id="profile-handle" class="handle" value="@yourhandle" placeholder="@yourhandle">
+    </div>
+    <div class="profile-stats">
+      <div class="pstat"><div class="pstat-num" id="stat-posts">0</div><div class="pstat-label">posts</div></div>
+      <div class="pstat"><div class="pstat-num"><input id="stat-followers" value="0" style="width:60px;border:none;background:transparent;font-size:15px;font-weight:500;text-align:center;padding:0" placeholder="0k"></div><div class="pstat-label">followers</div></div>
+      <div class="pstat"><div class="pstat-num"><input id="stat-following" value="0" style="width:48px;border:none;background:transparent;font-size:15px;font-weight:500;text-align:center;padding:0" placeholder="0"></div><div class="pstat-label">following</div></div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('grid',this)">Grid preview</button>
+    <button class="tab" onclick="switchTab('list',this)">Post list</button>
+    <button class="tab" onclick="switchTab('settings',this)">Settings</button>
+  </div>
+
+  <!-- Grid tab -->
+  <div class="grid-section active" id="tab-grid">
+    <div class="drag-hint">Drag posts to reorder your grid · Hover to preview caption</div>
+    <div class="ig-grid" id="ig-grid"></div>
+  </div>
+
+  <!-- List tab -->
+  <div class="grid-section" id="tab-list">
+    <div class="post-list" id="post-list"></div>
+    <button class="btn" style="margin-top:10px;width:100%" onclick="addPost()">+ Add post</button>
+  </div>
+
+  <!-- Settings tab -->
+  <div class="grid-section" id="tab-settings">
+    <div class="color-section">
+      <h4>Brand colours</h4>
+      <div class="color-row">
+        <div class="color-field">
+          <input type="color" id="c-bg" value="#FDFCFB" oninput="applyColour('--bg',this.value);syncHex('h-bg',this.value)">
+          <input type="text" id="h-bg" value="#FDFCFB" oninput="applyColourHex('--bg',this.value);syncPicker('c-bg',this.value)">
+          <label>Background</label>
+        </div>
+        <div class="color-field">
+          <input type="color" id="c-bg2" value="#F5F2EE" oninput="applyColour('--bg2',this.value);syncHex('h-bg2',this.value)">
+          <input type="text" id="h-bg2" value="#F5F2EE" oninput="applyColourHex('--bg2',this.value);syncPicker('c-bg2',this.value)">
+          <label>Surface</label>
+        </div>
+        <div class="color-field">
+          <input type="color" id="c-border" value="#E0DBD4" oninput="applyColour('--border',this.value);syncHex('h-border',this.value)">
+          <input type="text" id="h-border" value="#E0DBD4" oninput="applyColourHex('--border',this.value);syncPicker('c-border',this.value)">
+          <label>Border</label>
+        </div>
+        <div class="color-field">
+          <input type="color" id="c-text" value="#2C2A27" oninput="applyColour('--text',this.value);syncHex('h-text',this.value)">
+          <input type="text" id="h-text" value="#2C2A27" oninput="applyColourHex('--text',this.value);syncPicker('c-text',this.value)">
+          <label>Text</label>
+        </div>
+        <div class="color-field">
+          <input type="color" id="c-accent" value="#A89A8A" oninput="applyColour('--accent',this.value);syncHex('h-accent',this.value)">
+          <input type="text" id="h-accent" value="#A89A8A" oninput="applyColourHex('--accent',this.value);syncPicker('c-accent',this.value)">
+          <label>Accent</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="instructions">
+      <strong>How to use this widget</strong>
+      <ol>
+        <li>Click <strong>+ Add post</strong> to add a new post to your grid.</li>
+        <li>Paste an image URL (from Google Drive, Dropbox, Unsplash, Canva etc.) into the Image URL field.</li>
+        <li>Add your caption, scheduled date, and status.</li>
+        <li>In the <strong>Grid preview</strong> tab, drag posts to reorder your feed layout.</li>
+        <li>Hover over any grid cell to preview the caption.</li>
+        <li>Click <strong>Save grid</strong> to save everything in your browser.</li>
+        <li>Upload this HTML file to <a href="https://tiiny.host" target="_blank">tiiny.host</a> (free) to get a URL you can embed in Notion using <code>/embed</code>.</li>
+      </ol>
+      <br>
+      <strong>Image URL tips</strong>
+      <ol>
+        <li>Canva: export image → share → get link → copy direct image link</li>
+        <li>Google Drive: share file → anyone with link → copy URL then change <code>/view</code> to <code>/uc?export=view</code></li>
+        <li>Unsplash: right-click image → copy image address</li>
+        <li>Dropbox: share → copy link → change <code>dl=0</code> to <code>raw=1</code></li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Editor panel (shown inline when editing) -->
+  <div class="editor-panel" id="editor-panel">
+    <div class="editor-header">
+      <h3 id="editor-title">Edit post</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-danger" id="editor-delete" onclick="deleteCurrentPost()">Delete</button>
+        <button class="btn" onclick="closeEditor()">Cancel</button>
+        <button class="btn btn-primary" onclick="savePost()">Save post</button>
+      </div>
+    </div>
+    <div class="editor-grid">
+      <div>
+        <div class="editor-preview"><img id="editor-preview-img" src="" alt="" style="display:none"><div class="empty" id="editor-preview-empty" style="display:flex">No image yet</div></div>
+        <div class="field">
+          <label>Image URL</label>
+          <input id="edit-url" type="url" placeholder="https://..." oninput="previewImage(this.value)">
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="field">
+          <label>Post title (internal reference)</label>
+          <input id="edit-title" type="text" placeholder="e.g. Morning routine vlog">
+        </div>
+        <div class="field">
+          <label>Caption</label>
+          <textarea id="edit-caption" placeholder="Write your caption here..."></textarea>
+        </div>
+        <div class="field">
+          <label>Scheduled date</label>
+          <input id="edit-date" type="date">
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="edit-status">
+            <option value="idea">Idea</option>
+            <option value="draft">Draft</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="live">Live</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const STATUS_LABELS = { idea:'Idea', draft:'Draft', scheduled:'Scheduled', live:'Live' };
+const STATUS_CLASSES = { idea:'status-idea', draft:'status-draft', scheduled:'status-scheduled', live:'status-live' };
+
+let data = {
+  profile: { name:'Your Name', handle:'@yourhandle', avatar:'', followers:'0', following:'0' },
+  colours: { bg:'#FDFCFB', bg2:'#F5F2EE', border:'#E0DBD4', text:'#2C2A27', accent:'#A89A8A' },
+  posts: []
+};
+let editingIndex = -1;
+let dragSrc = null;
+
+function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+function load() {
+  try {
+    const s = localStorage.getItem('ig-grid-preview');
+    if (s) data = JSON.parse(s);
+    if (!data.posts) data.posts = [];
+  } catch(e) {}
+}
+
+function saveAll() {
+  data.profile.name = document.getElementById('profile-name').value;
+  data.profile.handle = document.getElementById('profile-handle').value;
+  data.profile.followers = document.getElementById('stat-followers').value;
+  data.profile.following = document.getElementById('stat-following').value;
+  localStorage.setItem('ig-grid-preview', JSON.stringify(data));
+  const note = document.getElementById('saved-note');
+  note.style.display = 'inline';
+  setTimeout(() => note.style.display = 'none', 2000);
+}
+
+function applyColour(v, val) {
+  document.documentElement.style.setProperty(v, val);
+  const k = v.replace('--','');
+  if (data.colours[k] !== undefined) data.colours[k] = val;
+}
+function applyColourHex(v, val) { if (/^#[0-9A-Fa-f]{6}$/.test(val)) applyColour(v, val); }
+function syncHex(id, val) { const el = document.getElementById(id); if(el) el.value = val; }
+function syncPicker(id, val) { if (/^#[0-9A-Fa-f]{6}$/.test(val)) { const el = document.getElementById(id); if(el) el.value = val; } }
+function restoreColours() {
+  Object.entries(data.colours).forEach(([k,v]) => {
+    document.documentElement.style.setProperty('--'+k, v);
+    syncHex('h-'+k, v); syncPicker('c-'+k, v);
+  });
+}
+function restoreProfile() {
+  document.getElementById('profile-name').value = data.profile.name||'Your Name';
+  document.getElementById('profile-handle').value = data.profile.handle||'@yourhandle';
+  document.getElementById('stat-followers').value = data.profile.followers||'0';
+  document.getElementById('stat-following').value = data.profile.following||'0';
+  if (data.profile.avatar) {
+    document.getElementById('avatar-img').src = data.profile.avatar;
+    document.getElementById('avatar-img').style.display = 'block';
+    document.getElementById('avatar-hint').style.display = 'none';
+  }
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.grid-section').forEach(s => s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'list') renderList();
+}
+
+/* Grid rendering */
+function renderGrid() {
+  const grid = document.getElementById('ig-grid');
+  grid.innerHTML = '';
+  document.getElementById('stat-posts').textContent = data.posts.length;
+  const slots = Math.max(9, data.posts.length + (data.posts.length % 3 === 0 ? 3 : 3 - data.posts.length % 3));
+  for (let i = 0; i < slots; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'grid-cell';
+    cell.dataset.index = i;
+    if (i < data.posts.length) {
+      const post = data.posts[i];
+      if (post.url) {
+        const img = document.createElement('img');
+        img.src = post.url;
+        img.onerror = () => { img.style.display='none'; cell.querySelector('.overlay').innerHTML = '<div style="padding:8px;font-size:10px;color:var(--text3)">Image failed to load</div>'; };
+        cell.appendChild(img);
+      } else {
+        const ph = document.createElement('div');
+        ph.className = 'placeholder';
+        ph.innerHTML = '<span class="placeholder-icon">+</span><span>Add image</span>';
+        ph.onclick = () => openEditor(i);
+        cell.appendChild(ph);
+      }
+      const badge = document.createElement('div');
+      badge.className = 'status-badge ' + (STATUS_CLASSES[post.status]||'status-draft');
+      badge.textContent = STATUS_LABELS[post.status]||post.status;
+      cell.appendChild(badge);
+      const num = document.createElement('div');
+      num.className = 'cell-num';
+      num.textContent = '#' + (i+1);
+      cell.appendChild(num);
+      const overlay = document.createElement('div');
+      overlay.className = 'overlay';
+      overlay.innerHTML = `<div class="overlay-content"><div class="overlay-caption">${post.caption||''}</div></div>`;
+      cell.appendChild(overlay);
+      const actions = document.createElement('div');
+      actions.className = 'cell-actions';
+      actions.innerHTML = `<button class="cell-btn cell-btn-edit" onclick="event.stopPropagation();openEditor(${i})">Edit</button><button class="cell-btn cell-btn-del" onclick="event.stopPropagation();confirmDelete(${i})">×</button>`;
+      cell.appendChild(actions);
+      cell.draggable = true;
+      cell.addEventListener('dragstart', onDragStart);
+      cell.addEventListener('dragover', onDragOver);
+      cell.addEventListener('drop', onDrop);
+      cell.addEventListener('dragend', onDragEnd);
+      cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+    } else {
+      const ph = document.createElement('div');
+      ph.className = 'placeholder';
+      ph.innerHTML = `<span class="placeholder-icon" style="font-size:16px;color:var(--text3)">+</span><span>Empty slot</span>`;
+      ph.onclick = () => { addPost(); };
+      cell.appendChild(ph);
+    }
+    grid.appendChild(cell);
+  }
+}
+
+/* Drag and drop */
+function onDragStart(e) {
+  dragSrc = +this.dataset.index;
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  this.classList.add('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  const target = +this.dataset.index;
+  if (dragSrc === target || dragSrc === null) return;
+  if (dragSrc < data.posts.length && target < data.posts.length) {
+    const tmp = data.posts[dragSrc];
+    data.posts[dragSrc] = data.posts[target];
+    data.posts[target] = tmp;
+  } else if (dragSrc < data.posts.length && target >= data.posts.length) {
+    data.posts.push(data.posts.splice(dragSrc, 1)[0]);
+  }
+  renderGrid();
+  saveAll();
+}
+function onDragEnd() {
+  document.querySelectorAll('.grid-cell').forEach(c => { c.classList.remove('dragging','drag-over'); });
+  dragSrc = null;
+}
+
+/* List rendering */
+function renderList() {
+  const list = document.getElementById('post-list');
+  list.innerHTML = '';
+  if (data.posts.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:13px">No posts yet. Click + Add post to get started.</div>';
+    return;
+  }
+  data.posts.forEach((post, i) => {
+    const div = document.createElement('div');
+    div.className = 'post-item';
+    div.innerHTML = `
+      <div class="post-thumb">${post.url ? `<img src="${post.url}" onerror="this.parentElement.innerHTML='<div class=empty-thumb>?</div>'">` : '<div class="empty-thumb">+</div>'}</div>
+      <div class="post-info">
+        <div class="post-title-text">${post.title||'Untitled post'}</div>
+        <div class="post-meta-row">
+          <span class="status-badge ${STATUS_CLASSES[post.status]||'status-draft'}" style="position:static">${STATUS_LABELS[post.status]||post.status}</span>
+          ${post.date ? `<span class="post-date">${post.date}</span>` : ''}
+        </div>
+      </div>
+      <div class="post-actions">
+        <button class="btn" onclick="openEditor(${i})">Edit</button>
+        <button class="btn btn-danger" onclick="confirmDelete(${i})">Delete</button>
+      </div>`;
+    list.appendChild(div);
+  });
+}
+
+/* Editor */
+function openEditor(index) {
+  editingIndex = index;
+  const panel = document.getElementById('editor-panel');
+  panel.classList.add('open');
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  if (index < data.posts.length) {
+    const post = data.posts[index];
+    document.getElementById('editor-title').textContent = 'Edit post #' + (index+1);
+    document.getElementById('edit-url').value = post.url||'';
+    document.getElementById('edit-title').value = post.title||'';
+    document.getElementById('edit-caption').value = post.caption||'';
+    document.getElementById('edit-date').value = post.date||'';
+    document.getElementById('edit-status').value = post.status||'draft';
+    previewImage(post.url);
+  } else {
+    document.getElementById('editor-title').textContent = 'New post';
+    document.getElementById('edit-url').value = '';
+    document.getElementById('edit-title').value = '';
+    document.getElementById('edit-caption').value = '';
+    document.getElementById('edit-date').value = '';
+    document.getElementById('edit-status').value = 'draft';
+    previewImage('');
+  }
+}
+function closeEditor() {
+  document.getElementById('editor-panel').classList.remove('open');
+  editingIndex = -1;
+}
+function savePost() {
+  const post = {
+    id: editingIndex < data.posts.length ? data.posts[editingIndex].id : generateId(),
+    url: document.getElementById('edit-url').value.trim(),
+    title: document.getElementById('edit-title').value.trim(),
+    caption: document.getElementById('edit-caption').value.trim(),
+    date: document.getElementById('edit-date').value,
+    status: document.getElementById('edit-status').value,
+  };
+  if (editingIndex < data.posts.length) {
+    data.posts[editingIndex] = post;
+  } else {
+    data.posts.push(post);
+  }
+  closeEditor();
+  renderGrid();
+  renderList();
+  saveAll();
+}
+function previewImage(url) {
+  const img = document.getElementById('editor-preview-img');
+  const empty = document.getElementById('editor-preview-empty');
+  if (url) {
+    img.src = url;
+    img.style.display = 'block';
+    empty.style.display = 'none';
+    img.onerror = () => { img.style.display='none'; empty.style.display='flex'; empty.textContent='Image failed to load'; };
+  } else {
+    img.style.display = 'none';
+    empty.style.display = 'flex';
+    empty.textContent = 'No image yet';
+  }
+}
+function addPost() {
+  openEditor(data.posts.length);
+  document.getElementById('tab-grid').classList.remove('active');
+  document.getElementById('tab-list').classList.remove('active');
+  document.getElementById('tab-settings').classList.remove('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.tab').classList.add('active');
+  document.getElementById('tab-grid').classList.add('active');
+}
+function confirmDelete(i) {
+  if (confirm('Delete this post from the grid?')) {
+    data.posts.splice(i, 1);
+    closeEditor();
+    renderGrid();
+    renderList();
+    saveAll();
+  }
+}
+function deleteCurrentPost() {
+  if (editingIndex < data.posts.length) confirmDelete(editingIndex);
+}
+
+/* Avatar */
+document.getElementById('avatar-input').addEventListener('input', function() {
+  const url = this.value.trim();
+  data.profile.avatar = url;
+  const img = document.getElementById('avatar-img');
+  const hint = document.getElementById('avatar-hint');
+  if (url) { img.src = url; img.style.display='block'; hint.style.display='none'; }
+  else { img.style.display='none'; hint.style.display='block'; }
+});
+document.querySelector('.avatar').addEventListener('dblclick', function() {
+  const url = prompt('Paste your profile photo URL:');
+  if (url !== null) {
+    data.profile.avatar = url.trim();
+    document.getElementById('avatar-input').value = url.trim();
+    document.getElementById('avatar-input').dispatchEvent(new Event('input'));
+  }
+});
+
+load();
+restoreColours();
+restoreProfile();
+renderGrid();
+</script>
+</body>
+</html>
