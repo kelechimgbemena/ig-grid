@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instagram Grid Preview</title>
+<style>
+  :root{
+    --ig-black:#262626; --ig-gray:#8e8e8e; --ig-border:#dbdbdb; --ig-bg:#fafafa;
+    --ring1:#f09433; --ring2:#e6683c; --ring3:#dc2743; --ring4:#cc2366; --ring5:#bc1888;
+    --idea:#C9B8E8; --draft:#F0C48A; --scheduled:#8FB4D9; --live:#8FBF8F;
+
+    /* customizable via Settings tab */
+    --p-bg:#FAF5EE; --p-surface:#ffffff; --p-border:#E4D8CC; --p-text:#3B2F2A; --p-accent:#A3543A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--ig-bg);color:var(--ig-black);-webkit-font-smoothing:antialiased;}
+  .phone{max-width:420px;margin:0 auto;background:#fff;min-height:100vh;border-left:1px solid var(--ig-border);border-right:1px solid var(--ig-border);}
+
+  /* ---- Instagram chrome (kept authentic, not themeable) ---- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--ig-border);}
+  .topbar .handle{font-size:18px;font-weight:600;display:flex;align-items:center;gap:5px;}
+  .topbar .handle .verified{flex-shrink:0;}
+  .topbar .icons{display:flex;gap:18px;font-size:19px;}
+  .topbar .icons span{cursor:pointer;}
+  .profile{padding:16px;}
+  .profile-top{display:flex;align-items:center;}
+  .avatar-ring{width:86px;height:86px;border-radius:50%;flex-shrink:0;background:linear-gradient(45deg,var(--ring1),var(--ring2),var(--ring3),var(--ring4),var(--ring5));padding:3px;cursor:pointer;position:relative;}
+  .avatar-ring.dragover{outline:2px dashed #fff;outline-offset:2px;}
+  .avatar-ring .avatar-hint{position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;border-radius:50%;background:var(--p-accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid #fff;}
+  .avatar{width:100%;height:100%;border-radius:50%;background:#fff;padding:2px;}
+  .avatar-inner{width:100%;height:100%;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,var(--p-accent),#6B3F2E);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-family:Georgia,serif;}
+  .avatar-inner img{width:100%;height:100%;object-fit:cover;}
+  .stats{flex:1;display:flex;justify-content:space-around;text-align:center;}
+  .stats .stat b{display:block;font-size:17px;font-weight:600;} .stats .stat span{font-size:13px;}
+  .stats .stat.editable{cursor:text;}
+  .name-bio{margin-top:14px;}
+  .display-name{font-size:14px;font-weight:600;outline:none;cursor:text;}
+  .bio-text{font-size:14px;line-height:1.4;margin-top:2px;outline:none;cursor:text;white-space:pre-wrap;}
+  .bio-link{font-size:14px;color:#00376b;font-weight:600;margin-top:2px;outline:none;cursor:text;}
+  .edit-profile-btn{margin-top:14px;width:100%;padding:7px 0;background:#efefef;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+
+  .highlights{display:flex;gap:18px;padding:16px 16px 8px;overflow-x:auto;scrollbar-width:none;}
+  .highlights::-webkit-scrollbar{display:none;}
+  .hl{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;cursor:pointer;width:64px;}
+  .hl-circle{width:64px;height:64px;border-radius:50%;background:linear-gradient(45deg,var(--ring1),var(--ring2),var(--ring3),var(--ring4),var(--ring5));padding:2.5px;}
+  .hl-circle-inner{width:100%;height:100%;border-radius:50%;background:#fff;padding:2px;}
+  .hl-cover{width:100%;height:100%;border-radius:50%;overflow:hidden;background:#f0f0f0;}
+  .hl-cover img{width:100%;height:100%;object-fit:cover;}
+  .hl-label{font-size:11.5px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;}
+  .hl-add-circle{width:64px;height:64px;border-radius:50%;border:1px solid var(--ig-border);display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--ig-gray);background:#fff;}
+
+  .tabs{display:flex;border-top:1px solid var(--ig-border);}
+  .tab{flex:1;text-align:center;padding:11px 0;font-size:12px;letter-spacing:.5px;color:var(--ig-gray);border-top:1px solid transparent;cursor:pointer;}
+  .tab.active{color:var(--ig-black);border-top:1px solid var(--ig-black);}
+  .tab-icon{font-size:18px;display:block;margin-bottom:2px;}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:#fff;}
+  .tile{position:relative;aspect-ratio:1/1;background:#efefef;overflow:hidden;cursor:grab;touch-action:none;}
+  .tile img,.tile video{width:100%;height:100%;object-fit:cover;display:block;}
+  .tile.empty{display:flex;align-items:center;justify-content:center;color:var(--ig-gray);font-size:11px;background:repeating-linear-gradient(45deg,#f5f5f5,#f5f5f5 6px,#fff 6px,#fff 12px);cursor:pointer;}
+  .tile.dragging{opacity:.4;} .tile.dragover{outline:2px dashed var(--p-accent);outline-offset:-2px;}
+  .tile .status-dot{position:absolute;top:6px;left:6px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.9);}
+  .status-dot.idea{background:var(--idea);} .status-dot.draft{background:var(--draft);}
+  .status-dot.scheduled{background:var(--scheduled);} .status-dot.live{background:var(--live);}
+  .tile .video-icon{position:absolute;top:6px;right:6px;color:#fff;font-size:14px;text-shadow:0 0 3px rgba(0,0,0,.6);}
+  .tile .tile-actions{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:flex-end;gap:4px;padding:5px;background:linear-gradient(transparent,rgba(0,0,0,.45));opacity:0;transition:opacity .15s;}
+  .tile:hover .tile-actions{opacity:1;}
+  .tile-actions button{border:none;background:rgba(255,255,255,.9);color:var(--ig-black);width:22px;height:22px;border-radius:50%;font-size:11px;cursor:pointer;}
+
+  /* ---- Planner panel (fully themeable via Settings) ---- */
+  .panel{margin:0;background:var(--p-bg);border-top:8px solid #efefef;padding:0 0 40px;color:var(--p-text);}
+  .panel-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--p-accent);font-weight:700;padding:16px 16px 0;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .panel-toggle{
+    font-size:10px;letter-spacing:.5px;text-transform:none;font-weight:600;
+    background:none;border:1px solid var(--p-border);color:var(--p-accent);
+    padding:4px 10px;border-radius:20px;cursor:pointer;flex-shrink:0;
+    display:inline-flex;align-items:center;gap:4px;
+  }
+  .panel-toggle:hover{background:var(--p-bg);}
+  .panel-collapsible{overflow:hidden;transition:max-height .25s ease;}
+  .panel-collapsible.collapsed{max-height:0 !important;}
+  .panel-tabs{display:flex;gap:2px;padding:12px 16px 0;}
+  .panel-tab{flex:1;text-align:center;padding:9px 4px;font-size:11.5px;font-weight:600;letter-spacing:.3px;background:var(--p-surface);border:1px solid var(--p-border);color:var(--p-text);cursor:pointer;border-radius:6px 6px 0 0;opacity:.55;}
+  .panel-tab.active{opacity:1;border-bottom:2px solid var(--p-accent);}
+  .panel-body{padding:16px;background:var(--p-surface);border:1px solid var(--p-border);margin:0 16px;border-radius:0 0 8px 8px;}
+  .panel-section{display:none;} .panel-section.active{display:block;}
+
+  .panel h2{font-family:Georgia,serif;font-weight:normal;font-size:15px;margin:0 0 14px;color:var(--p-accent);}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--p-text);opacity:.6;margin-bottom:4px;}
+  .field input,.field textarea,.field select{width:100%;padding:8px 10px;border:1px solid var(--p-border);border-radius:5px;font-size:13px;font-family:inherit;background:var(--p-bg);color:var(--p-text);}
+  .field textarea{resize:vertical;min-height:50px;}
+  .row2{display:flex;gap:10px;} .row2 .field{flex:1;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:5px;border:none;cursor:pointer;font-size:12.5px;font-weight:600;}
+  .btn-primary{background:var(--p-accent);color:#fff;} .btn-primary:hover{opacity:.9;}
+  .btn-ghost{background:transparent;color:var(--p-text);border:1px solid var(--p-border);}
+  .btn-row{display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;}
+  .status-msg{font-size:11.5px;color:var(--p-text);opacity:.7;margin-top:10px;min-height:14px;}
+  .status-msg.ok{color:#5a8a5a;opacity:1;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;font-size:11px;opacity:.75;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+  /* drag-and-drop zone */
+  .dropzone{
+    border:2px dashed var(--p-border);border-radius:8px;padding:20px 12px;text-align:center;
+    font-size:12px;color:var(--p-text);opacity:.7;cursor:pointer;margin-bottom:12px;background:var(--p-bg);
+  }
+  .dropzone.dragover{border-color:var(--p-accent);opacity:1;background:rgba(163,84,58,.06);}
+  .dropzone.has-preview{padding:0;overflow:hidden;border-style:solid;}
+  .dropzone.has-preview img,.dropzone.has-preview video{width:100%;max-height:180px;object-fit:cover;display:block;}
+  .dz-hint{font-size:10.5px;margin-top:4px;opacity:.7;}
+  .or-divider{text-align:center;font-size:10.5px;opacity:.55;margin:10px 0;text-transform:uppercase;letter-spacing:.5px;}
+
+  /* list view */
+  .post-list{display:flex;flex-direction:column;gap:8px;}
+  .post-row{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--p-border);border-radius:6px;background:var(--p-bg);}
+  .post-row .thumb{width:44px;height:44px;border-radius:4px;overflow:hidden;background:var(--p-border);flex-shrink:0;}
+  .post-row .thumb img,.post-row .thumb video{width:100%;height:100%;object-fit:cover;}
+  .post-row .info{flex:1;min-width:0;}
+  .post-row .info .t{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .post-row .info .meta{font-size:11px;opacity:.65;}
+  .post-row .row-actions{display:flex;gap:4px;}
+  .post-row .row-actions button{border:none;background:transparent;cursor:pointer;font-size:13px;padding:4px;}
+  .empty-list{text-align:center;padding:20px;opacity:.6;font-size:12.5px;}
+
+  /* settings */
+  .color-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--p-border);}
+  .color-row label{font-size:12.5px;}
+  .color-row input[type=color]{width:38px;height:28px;border:1px solid var(--p-border);border-radius:5px;padding:0;cursor:pointer;background:none;}
+  .host-steps{font-size:12px;line-height:1.6;opacity:.85;margin-top:14px;}
+  .host-steps b{color:var(--p-accent);}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <div class="topbar">
+    <div class="handle" id="topHandle">your.handle <svg class="verified" viewBox="0 0 40 40" width="14" height="14"><path fill="#3897f0" d="M19.998 3.094 24.359.19a1 1 0 0 1 1.316.226l2.42 3.06 3.833-1.028a1 1 0 0 1 1.234.706l1.011 3.828 3.828 1.011a1 1 0 0 1 .706 1.234l-1.028 3.833 3.06 2.42a1 1 0 0 1 .226 1.316l-2.06 3.104 2.06 3.104a1 1 0 0 1-.226 1.316l-3.06 2.42 1.028 3.833a1 1 0 0 1-.706 1.234l-3.828 1.011-1.011 3.828a1 1 0 0 1-1.234.706l-3.833-1.028-2.42 3.06a1 1 0 0 1-1.316.226l-3.104-2.06-3.104 2.06a1 1 0 0 1-1.316-.226l-2.42-3.06-3.833 1.028a1 1 0 0 1-1.234-.706l-1.011-3.828-3.828-1.011a1 1 0 0 1-.706-1.234l1.028-3.833-3.06-2.42a1 1 0 0 1-.226-1.316l2.06-3.104-2.06-3.104a1 1 0 0 1 .226-1.316l3.06-2.42-1.028-3.833a1 1 0 0 1 .706-1.234l3.828-1.011L8.634 3.476a1 1 0 0 1 1.234-.706l3.833 1.028 2.42-3.06a1 1 0 0 1 1.316-.226l3.104 2.06z"></path><path fill="#fff" d="M17.5 24.914 12.293 19.7l1.414-1.414 3.793 3.793 8.793-8.793 1.414 1.414z"></path></svg></div>
+    <div class="icons"><span id="topAddBtn" title="Add a post">➕</span><span id="topMenuBtn" title="Settings">☰</span></div>
+  </div>
+
+  <div class="profile">
+    <div class="profile-top">
+      <div class="avatar-ring" id="avatarWrap" title="Click or drag & drop a photo">
+        <div class="avatar"><div class="avatar-inner">
+          <span id="avatarInitial">✦</span>
+          <img id="avatarImg" style="display:none;">
+        </div></div>
+        <div class="avatar-hint">✎</div>
+      </div>
+      <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+      <div class="stats">
+        <div class="stat"><b id="postCount">0</b><span>posts</span></div>
+        <div class="stat editable"><b contenteditable="true" id="followersNum">0</b><span>followers</span></div>
+        <div class="stat editable"><b contenteditable="true" id="followingNum">0</b><span>following</span></div>
+      </div>
+    </div>
+    <div class="name-bio">
+      <div class="display-name" contenteditable="true" id="profName">Your Name</div>
+      <div class="bio-text" contenteditable="true" id="profBio">Creator · Planning my feed ✨</div>
+      <div class="bio-link" contenteditable="true" id="profLink">yourlink.com</div>
+    </div>
+    <button class="edit-profile-btn">Edit profile (click any field above)</button>
+  </div>
+
+  <div class="highlights" id="highlights"></div>
+
+  <div class="tabs">
+    <div class="tab active"><span class="tab-icon">▦</span>POSTS</div>
+    <div class="tab"><span class="tab-icon">▶</span>REELS</div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="panel">
+    <div class="panel-label">
+      <span>Content Planner — not part of your live Instagram</span>
+      <button class="panel-toggle" id="panelToggleBtn">▴ Hide planner</button>
+    </div>
+
+    <div class="panel-collapsible" id="panelCollapsible">
+    <div class="panel-tabs">
+      <div class="panel-tab active" data-tab="add">Add / Edit</div>
+      <div class="panel-tab" data-tab="list">Post List</div>
+      <div class="panel-tab" data-tab="import">Bulk Import</div>
+      <div class="panel-tab" data-tab="settings">Settings</div>
+      <div class="panel-tab" data-tab="help">Help</div>
+    </div>
+
+    <div class="panel-body">
+
+      <div class="panel-section active" id="section-add">
+        <div class="legend">
+          <span><i style="background:#C9B8E8"></i>Idea</span>
+          <span><i style="background:#F0C48A"></i>Draft</span>
+          <span><i style="background:#8FB4D9"></i>Scheduled</span>
+          <span><i style="background:#8FBF8F"></i>Live</span>
+        </div>
+
+        <h2 id="formTitle">Add a post</h2>
+
+        <div class="dropzone" id="dropzone">
+          <div id="dzContent">
+            <div>📷 Drag & drop an image or video here</div>
+            <div class="dz-hint">or click to browse your files</div>
+          </div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*,video/*" style="display:none;">
+        <div class="or-divider">or paste a URL instead</div>
+        <div class="field"><input type="text" id="f-url" placeholder="https://..."></div>
+
+        <div class="field"><label>Post title (internal reference)</label><input type="text" id="f-title" placeholder="e.g. Beach shoot #3"></div>
+        <div class="field"><label>Caption</label><textarea id="f-caption" placeholder="Write your caption..."></textarea></div>
+        <div class="row2">
+          <div class="field"><label>Scheduled date</label><input type="date" id="f-date"></div>
+          <div class="field"><label>Status</label>
+            <select id="f-status">
+              <option value="idea">Idea</option><option value="draft">Draft</option>
+              <option value="scheduled">Scheduled</option><option value="live">Live</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="saveBtn">Save post</button>
+          <button class="btn btn-ghost" id="cancelBtn" style="display:none;">Cancel edit</button>
+          <button class="btn btn-ghost" id="saveGridBtn">Save grid</button>
+        </div>
+        <div class="status-msg" id="statusMsg"></div>
+
+        <h2 style="margin-top:22px;">Highlights</h2>
+        <div class="btn-row"><button class="btn btn-ghost" id="addHighlightBtn">+ Add highlight</button></div>
+      </div>
+
+      <div class="panel-section" id="section-list">
+        <h2>All posts</h2>
+        <div class="post-list" id="postList"></div>
+      </div>
+
+      <div class="panel-section" id="section-import">
+        <h2>Bulk import from your Content Calendar</h2>
+        <p style="font-size:12px;opacity:.75;line-height:1.5;margin-top:0;">
+          In Notion, open your Content database as a table, select the rows (and header row), and copy them (<b>⌘/Ctrl + C</b>). Then paste below. Works with columns named <b>Title</b>, <b>Caption</b> or <b>Notes</b>, <b>Status</b>, <b>Date</b> or <b>Publish Date</b>, and <b>Image</b> or <b>URL</b> — matched automatically, in any order. Rows without an image URL will import with a placeholder you can fill in from the Add / Edit tab.
+        </p>
+        <div class="field">
+          <textarea id="importText" placeholder="Paste your copied Notion rows here..." style="min-height:120px;font-family:monospace;font-size:11.5px;"></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="importBtn">Parse & preview</button>
+        </div>
+        <div id="importPreview" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="panel-section" id="section-settings">
+        <h2>Planner colours</h2>
+        <div class="color-row"><label>Background</label><input type="color" id="c-bg" value="#FAF5EE"></div>
+        <div class="color-row"><label>Surface</label><input type="color" id="c-surface" value="#ffffff"></div>
+        <div class="color-row"><label>Border</label><input type="color" id="c-border" value="#E4D8CC"></div>
+        <div class="color-row"><label>Text</label><input type="color" id="c-text" value="#3B2F2A"></div>
+        <div class="color-row"><label>Accent</label><input type="color" id="c-accent" value="#A3543A"></div>
+        <p style="font-size:11px;opacity:.6;margin-top:10px;">These colours style the planner panel only — the Instagram preview above stays authentic to the real app so it accurately reflects how your feed will actually look.</p>
+
+        <div class="host-steps">
+          <b>Hosting this widget:</b><br>
+          1. Save this file, rename it <b>index.html</b><br>
+          2. Upload free to <b>tiiny.host</b>, GitHub Pages, Cloudflare Pages, or Vercel<br>
+          3. Copy your live URL<br>
+          4. In Notion, type <b>/embed</b> and paste the URL
+        </div>
+      </div>
+
+      <div class="panel-section" id="section-help">
+        <h2>How to use this widget</h2>
+
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:4px;">Adding a post</p>
+        <p style="font-size:12px;opacity:.8;line-height:1.55;margin-top:0;">
+          Drag a photo or video onto the dropzone, or click it to browse your files. Prefer linking to something already hosted (Canva, Drive, Dropbox)? Paste that URL in the field below the dropzone instead — using one clears the other.
+        </p>
+
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:4px;">Your profile photo</p>
+        <p style="font-size:12px;opacity:.8;line-height:1.55;margin-top:0;">
+          Click or drag a photo onto the avatar circle at the top. Already have a hosted image link? Shift-click the avatar to paste a URL instead.
+        </p>
+
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:4px;">Reordering your grid</p>
+        <p style="font-size:12px;opacity:.8;line-height:1.55;margin-top:0;">
+          Drag any tile in the grid onto another tile to swap their positions — rearrange until the feed reads the way you want it to.
+        </p>
+
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:4px;">Status dots</p>
+        <p style="font-size:12px;opacity:.8;line-height:1.55;margin-top:0;">
+          The small coloured dot in the corner of each tile shows where a post is in your pipeline — <b>Idea</b>, <b>Draft</b>, <b>Scheduled</b>, or <b>Live</b>. It's for your own planning only and never shows on real Instagram.
+        </p>
+
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:4px;">Highlights</p>
+        <p style="font-size:12px;opacity:.8;line-height:1.55;margin-top:0;">
+          Click "+ Add highlight" to create one, or click an existing highlight circle to edit its name/cover or delete it.
+        </p>
+
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:4px;">Bulk import</p>
+        <p style="font-size:12px;opacity:.8;line-height:1.55;margin-top:0;">
+          Already planning in a Notion database? Copy your rows and paste them into the Bulk Import tab instead of re-typing everything by hand — see that tab for the exact column names it recognises.
+        </p>
+
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:4px;">Saving your work</p>
+        <p style="font-size:12px;opacity:.8;line-height:1.55;margin-top:0;">
+          Everything saves automatically to this browser as you go. Click <b>Save grid</b> any time for peace of mind. Note: your grid is tied to this browser — it won't follow you to a different device or browser unless you're viewing it through the same embedded link.
+        </p>
+
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:4px;">Making it yours</p>
+        <p style="font-size:12px;opacity:.8;line-height:1.55;margin-top:0;">
+          Head to the Settings tab to recolour the planner panel and find the steps for hosting and embedding this widget in Notion.
+        </p>
+      </div>
+
+    </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var STORAGE_KEY = 'ig_grid_preview_v3';
+  var grid = document.getElementById('grid');
+  var hlWrap = document.getElementById('highlights');
+  var editingId = null;
+  var dragSrcIndex = null;
+  var pendingMediaData = null; // holds dropped/uploaded file as data URL until saved
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return {profile:{},posts:[],highlights:[],theme:{}};
+      var d = JSON.parse(raw);
+      d.posts = d.posts || []; d.highlights = d.highlights || []; d.theme = d.theme || {};
+      return d;
+    }catch(e){ return {profile:{},posts:[],highlights:[],theme:{}}; }
+  }
+  var state = load();
+
+  function save(silent){
+    var data = {
+      profile:{
+        name: document.getElementById('profName').innerText.trim(),
+        bio: document.getElementById('profBio').innerText.trim(),
+        link: document.getElementById('profLink').innerText.trim(),
+        handle: document.getElementById('topHandle').childNodes[0].textContent.trim(),
+        followers: document.getElementById('followersNum').innerText.trim(),
+        following: document.getElementById('followingNum').innerText.trim(),
+        avatar: document.getElementById('avatarImg').src || ''
+      },
+      posts: state.posts, highlights: state.highlights, theme: state.theme
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if(!silent){
+      var m = document.getElementById('statusMsg');
+      m.textContent = 'Grid saved ✓'; m.className = 'status-msg ok';
+      setTimeout(function(){ m.textContent=''; m.className='status-msg'; }, 2000);
+    }
+  }
+
+  // ---- restore profile ----
+  var p = state.profile || {};
+  if(p.name) document.getElementById('profName').innerText = p.name;
+  if(p.bio) document.getElementById('profBio').innerText = p.bio;
+  if(p.link) document.getElementById('profLink').innerText = p.link;
+  if(p.followers) document.getElementById('followersNum').innerText = p.followers;
+  if(p.following) document.getElementById('followingNum').innerText = p.following;
+  if(p.handle){ document.getElementById('topHandle').childNodes[0].textContent = p.handle + ' '; }
+  if(p.avatar){
+    document.getElementById('avatarImg').src = p.avatar;
+    document.getElementById('avatarImg').style.display = 'block';
+    document.getElementById('avatarInitial').style.display = 'none';
+  }
+  var avatarWrap = document.getElementById('avatarWrap');
+  var avatarFileInput = document.getElementById('avatarFileInput');
+
+  function setAvatarFromDataUrl(dataUrl){
+    var img = document.getElementById('avatarImg');
+    img.src = dataUrl; img.style.display='block';
+    document.getElementById('avatarInitial').style.display='none';
+    save(true);
+  }
+
+  function handleAvatarFile(file){
+    if(!file || file.type.indexOf('image/') !== 0) return;
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        var maxDim = 300; // avatars can be much smaller than grid photos
+        var w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = h*(maxDim/w); w = maxDim; }
+        else if(h > maxDim){ w = w*(maxDim/h); h = maxDim; }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        setAvatarFromDataUrl(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  avatarWrap.addEventListener('click', function(e){
+    // shift-click still supports pasting an external URL instead of uploading
+    if(e.shiftKey){
+      var url = prompt('Paste a profile photo URL instead:');
+      if(url) setAvatarFromDataUrl(url);
+      return;
+    }
+    avatarFileInput.click();
+  });
+  avatarFileInput.addEventListener('change', function(){
+    if(avatarFileInput.files.length) handleAvatarFile(avatarFileInput.files[0]);
+  });
+  avatarWrap.addEventListener('dragover', function(e){ e.preventDefault(); avatarWrap.classList.add('dragover'); });
+  avatarWrap.addEventListener('dragleave', function(){ avatarWrap.classList.remove('dragover'); });
+  avatarWrap.addEventListener('drop', function(e){
+    e.preventDefault(); avatarWrap.classList.remove('dragover');
+    if(e.dataTransfer.files.length) handleAvatarFile(e.dataTransfer.files[0]);
+  });
+  document.getElementById('profName').addEventListener('blur', function(){
+    document.getElementById('topHandle').childNodes[0].textContent = this.innerText.trim() + ' ';
+    save(true);
+  });
+  ['profBio','profLink','followersNum','followingNum'].forEach(function(id){
+    document.getElementById(id).addEventListener('blur', function(){ save(true); });
+  });
+
+  // ---- theme ----
+  function applyTheme(t){
+    var root = document.documentElement.style;
+    if(t.bg) root.setProperty('--p-bg', t.bg);
+    if(t.surface) root.setProperty('--p-surface', t.surface);
+    if(t.border) root.setProperty('--p-border', t.border);
+    if(t.text) root.setProperty('--p-text', t.text);
+    if(t.accent) root.setProperty('--p-accent', t.accent);
+  }
+  var savedTheme = state.theme || {};
+  if(savedTheme.bg) document.getElementById('c-bg').value = savedTheme.bg;
+  if(savedTheme.surface) document.getElementById('c-surface').value = savedTheme.surface;
+  if(savedTheme.border) document.getElementById('c-border').value = savedTheme.border;
+  if(savedTheme.text) document.getElementById('c-text').value = savedTheme.text;
+  if(savedTheme.accent) document.getElementById('c-accent').value = savedTheme.accent;
+  applyTheme(savedTheme);
+
+  [['c-bg','bg'],['c-surface','surface'],['c-border','border'],['c-text','text'],['c-accent','accent']].forEach(function(pair){
+    document.getElementById(pair[0]).addEventListener('input', function(){
+      state.theme[pair[1]] = this.value;
+      applyTheme(state.theme);
+      save(true);
+    });
+  });
+
+  // ---- panel tabs ----
+  document.querySelectorAll('.panel-tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.panel-tab').forEach(function(t){ t.classList.remove('active'); });
+      document.querySelectorAll('.panel-section').forEach(function(s){ s.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById('section-'+tab.dataset.tab).classList.add('active');
+      if(tab.dataset.tab === 'list') renderPostList();
+    });
+  });
+
+  function isVideo(url){ return /\.(mp4|webm|mov)(\?|$)/i.test(url || '') || (url||'').indexOf('video/') !== -1; }
+
+  // ---- drag & drop / file upload with compression ----
+  var dropzone = document.getElementById('dropzone');
+  var fileInput = document.getElementById('fileInput');
+
+  dropzone.addEventListener('click', function(){ fileInput.click(); });
+  dropzone.addEventListener('dragover', function(e){ e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', function(){ dropzone.classList.remove('dragover'); });
+  dropzone.addEventListener('drop', function(e){
+    e.preventDefault(); dropzone.classList.remove('dragover');
+    if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', function(){
+    if(fileInput.files.length) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file){
+    if(file.type.indexOf('video/') === 0){
+      var vReader = new FileReader();
+      vReader.onload = function(e){
+        pendingMediaData = e.target.result;
+        showDzPreview(pendingMediaData, true);
+      };
+      vReader.readAsDataURL(file);
+      return;
+    }
+    // image: compress via canvas before storing
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var img = new Image();
+      img.onload = function(){
+        var maxDim = 900;
+        var w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = h*(maxDim/w); w = maxDim; }
+        else if(h > maxDim){ w = w*(maxDim/h); h = maxDim; }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        pendingMediaData = canvas.toDataURL('image/jpeg', 0.82);
+        showDzPreview(pendingMediaData, false);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function showDzPreview(dataUrl, isVid){
+    dropzone.classList.add('has-preview');
+    document.getElementById('dzContent').innerHTML = isVid
+      ? '<video src="'+dataUrl+'" muted loop autoplay></video>'
+      : '<img src="'+dataUrl+'">';
+    document.getElementById('f-url').value = '';
+  }
+  function resetDropzone(){
+    pendingMediaData = null;
+    dropzone.classList.remove('has-preview');
+    document.getElementById('dzContent').innerHTML =
+      '<div>📷 Drag & drop an image or video here</div><div class="dz-hint">or click to browse your files</div>';
+  }
+  document.getElementById('f-url').addEventListener('input', function(){
+    if(this.value.trim()) resetDropzone();
+  });
+
+  // ---- highlights ----
+  function renderHighlights(){
+    hlWrap.innerHTML = '';
+    state.highlights.forEach(function(h, idx){
+      var el = document.createElement('div');
+      el.className = 'hl';
+      el.innerHTML = '<div class="hl-circle"><div class="hl-circle-inner"><div class="hl-cover">' +
+        (h.cover ? '<img src="'+h.cover+'">' : '') + '</div></div></div>' +
+        '<div class="hl-label">'+(h.title||'Untitled')+'</div>';
+      el.addEventListener('click', function(){
+        var action = confirm('Edit "'+h.title+'"?\nOK = edit, Cancel = delete');
+        if(action){
+          var t = prompt('Highlight name:', h.title) || h.title;
+          var c = prompt('Cover image URL:', h.cover) || h.cover;
+          state.highlights[idx] = {title:t, cover:c};
+        } else { state.highlights.splice(idx,1); }
+        renderHighlights(); save(true);
+      });
+      hlWrap.appendChild(el);
+    });
+    var add = document.createElement('div');
+    add.className = 'hl';
+    add.innerHTML = '<div class="hl-add-circle">+</div><div class="hl-label">New</div>';
+    add.addEventListener('click', addHighlight);
+    hlWrap.appendChild(add);
+  }
+  function addHighlight(){
+    var t = prompt('Highlight name (e.g. "Behind the Scenes"):');
+    if(!t) return;
+    var c = prompt('Cover image URL (optional):') || '';
+    state.highlights.push({title:t, cover:c});
+    renderHighlights(); save(true);
+  }
+  document.getElementById('addHighlightBtn').addEventListener('click', addHighlight);
+
+  // ---- grid ----
+  function render(){
+    grid.innerHTML = '';
+    var slots = Math.max(9, Math.ceil((state.posts.length+1)/3)*3);
+    state.posts.forEach(function(post, idx){
+      var tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.draggable = true;
+      tile.dataset.index = idx;
+      var media = isVideo(post.url) ? '<video src="'+post.url+'" muted loop></video>' : '<img src="'+post.url+'" alt="">';
+      tile.innerHTML = media +
+        '<div class="status-dot '+post.status+'"></div>' +
+        (isVideo(post.url) ? '<div class="video-icon">▶</div>' : '') +
+        '<div class="tile-actions"><button class="edit-btn">✎</button><button class="del-btn">✕</button></div>';
+      tile.querySelector('.edit-btn').addEventListener('click', function(e){ e.stopPropagation(); editPost(idx); });
+      tile.querySelector('.del-btn').addEventListener('click', function(e){ e.stopPropagation(); deletePost(idx); });
+      tile.addEventListener('dragstart', function(){ dragSrcIndex = idx; tile.classList.add('dragging'); });
+      tile.addEventListener('dragend', function(){ tile.classList.remove('dragging'); });
+      tile.addEventListener('dragover', function(e){ e.preventDefault(); tile.classList.add('dragover'); });
+      tile.addEventListener('dragleave', function(){ tile.classList.remove('dragover'); });
+      tile.addEventListener('drop', function(e){
+        e.preventDefault(); tile.classList.remove('dragover');
+        if(dragSrcIndex === null || dragSrcIndex === idx) return;
+        var moved = state.posts.splice(dragSrcIndex,1)[0];
+        state.posts.splice(idx,0,moved);
+        dragSrcIndex = null; render(); save(true);
+      });
+
+      // touch support (mobile / tablet — native HTML5 drag doesn't work on touchscreens)
+      tile.addEventListener('touchstart', function(e){
+        dragSrcIndex = idx; tile.classList.add('dragging');
+      }, {passive:true});
+      tile.addEventListener('touchmove', function(e){
+        e.preventDefault();
+        var touch = e.touches[0];
+        var el = document.elementFromPoint(touch.clientX, touch.clientY);
+        document.querySelectorAll('.tile.dragover').forEach(function(t){ t.classList.remove('dragover'); });
+        var overTile = el ? el.closest('.tile') : null;
+        if(overTile) overTile.classList.add('dragover');
+      }, {passive:false});
+      tile.addEventListener('touchend', function(e){
+        tile.classList.remove('dragging');
+        document.querySelectorAll('.tile.dragover').forEach(function(t){ t.classList.remove('dragover'); });
+        var touch = e.changedTouches[0];
+        var el = document.elementFromPoint(touch.clientX, touch.clientY);
+        var overTile = el ? el.closest('.tile') : null;
+        if(!overTile || dragSrcIndex === null) { dragSrcIndex = null; return; }
+        var targetIdx = parseInt(overTile.dataset.index, 10);
+        if(isNaN(targetIdx) || targetIdx === dragSrcIndex){ dragSrcIndex = null; return; }
+        var moved = state.posts.splice(dragSrcIndex,1)[0];
+        state.posts.splice(targetIdx,0,moved);
+        dragSrcIndex = null; render(); save(true);
+      });
+      grid.appendChild(tile);
+    });
+    for(var i = state.posts.length; i < slots; i++){
+      var empty = document.createElement('div');
+      empty.className = 'tile empty'; empty.textContent = '+';
+      empty.addEventListener('click', function(){ document.getElementById('f-url').focus(); });
+      grid.appendChild(empty);
+    }
+    document.getElementById('postCount').textContent = state.posts.length;
+  }
+
+  function renderPostList(){
+    var wrap = document.getElementById('postList');
+    wrap.innerHTML = '';
+    if(!state.posts.length){
+      wrap.innerHTML = '<div class="empty-list">No posts yet — add one from the Add / Edit tab.</div>';
+      return;
+    }
+    state.posts.forEach(function(post, idx){
+      var row = document.createElement('div');
+      row.className = 'post-row';
+      var media = isVideo(post.url) ? '<video src="'+post.url+'" muted></video>' : '<img src="'+post.url+'">';
+      row.innerHTML =
+        '<div class="thumb">'+media+'</div>' +
+        '<div class="info"><div class="t">'+(post.title || post.caption || 'Untitled post')+'</div>' +
+        '<div class="meta">'+(post.status)+(post.date ? ' · '+post.date : '')+'</div></div>' +
+        '<div class="row-actions"><button class="e">✎</button><button class="d">✕</button></div>';
+      row.querySelector('.e').addEventListener('click', function(){
+        document.querySelector('.panel-tab[data-tab="add"]').click();
+        editPost(idx);
+      });
+      row.querySelector('.d').addEventListener('click', function(){ deletePost(idx); renderPostList(); });
+      wrap.appendChild(row);
+    });
+  }
+
+  function resetForm(){
+    document.getElementById('f-url').value = '';
+    document.getElementById('f-title').value = '';
+    document.getElementById('f-caption').value = '';
+    document.getElementById('f-date').value = '';
+    document.getElementById('f-status').value = 'idea';
+    document.getElementById('formTitle').textContent = 'Add a post';
+    document.getElementById('cancelBtn').style.display = 'none';
+    editingId = null;
+    resetDropzone();
+  }
+
+  function editPost(idx){
+    var post = state.posts[idx];
+    document.getElementById('f-url').value = post.url.indexOf('data:') === 0 ? '' : post.url;
+    document.getElementById('f-title').value = post.title || '';
+    document.getElementById('f-caption').value = post.caption;
+    document.getElementById('f-date').value = post.date || '';
+    document.getElementById('f-status').value = post.status;
+    document.getElementById('formTitle').textContent = 'Edit post';
+    document.getElementById('cancelBtn').style.display = 'inline-flex';
+    editingId = idx;
+    if(post.url.indexOf('data:') === 0){
+      pendingMediaData = post.url;
+      showDzPreview(post.url, isVideo(post.url));
+    } else {
+      resetDropzone();
+    }
+    window.scrollTo({top: document.querySelector('.panel').offsetTop - 10, behavior:'smooth'});
+  }
+
+  function deletePost(idx){
+    if(!confirm('Remove this post from the grid?')) return;
+    state.posts.splice(idx,1);
+    render(); save(true);
+  }
+
+  document.getElementById('saveBtn').addEventListener('click', function(){
+    var url = pendingMediaData || document.getElementById('f-url').value.trim();
+    if(!url){ alert('Drop an image/video, or paste a URL first.'); return; }
+    var post = {
+      url: url,
+      title: document.getElementById('f-title').value.trim(),
+      caption: document.getElementById('f-caption').value.trim(),
+      date: document.getElementById('f-date').value,
+      status: document.getElementById('f-status').value
+    };
+    if(editingId !== null){ state.posts[editingId] = post; }
+    else { state.posts.unshift(post); }
+    render(); save(true); resetForm();
+  });
+
+  document.getElementById('cancelBtn').addEventListener('click', resetForm);
+  document.getElementById('saveGridBtn').addEventListener('click', function(){ save(false); });
+
+  // ---- bulk import ----
+  function parseDelimitedText(text){
+    var delim = text.indexOf('\t') !== -1 ? '\t' : ',';
+    var lines = text.split(/\r\n|\r|\n/).filter(function(l){ return l.trim().length; });
+    if(!lines.length) return [];
+
+    function splitLine(line){
+      if(delim === '\t') return line.split('\t');
+      // basic quoted-CSV aware split
+      var out = [], cur = '', inQuotes = false;
+      for(var i=0;i<line.length;i++){
+        var ch = line[i];
+        if(ch === '"'){ inQuotes = !inQuotes; }
+        else if(ch === ',' && !inQuotes){ out.push(cur); cur=''; }
+        else { cur += ch; }
+      }
+      out.push(cur);
+      return out.map(function(c){ return c.trim().replace(/^"|"$/g,''); });
+    }
+
+    var header = splitLine(lines[0]).map(function(h){ return h.trim().toLowerCase(); });
+    var rows = lines.slice(1).map(splitLine);
+
+    function findCol(names){
+      for(var i=0;i<header.length;i++){
+        for(var j=0;j<names.length;j++){
+          if(header[i].indexOf(names[j]) !== -1) return i;
+        }
+      }
+      return -1;
+    }
+    var iUrl = findCol(['image','url','media']);
+    var iTitle = findCol(['title','name']);
+    var iCaption = findCol(['caption','notes','description']);
+    var iDate = findCol(['publish date','date']);
+    var iStatus = findCol(['status']);
+
+    return rows.map(function(r){
+      var statusRaw = (iStatus !== -1 ? r[iStatus] : '').toLowerCase();
+      var status = ['idea','draft','scheduled','live'].filter(function(s){ return statusRaw.indexOf(s) !== -1; })[0] || 'idea';
+      var dateRaw = iDate !== -1 ? (r[iDate]||'') : '';
+      var parsedDate = '';
+      var d = new Date(dateRaw);
+      if(dateRaw && !isNaN(d)) parsedDate = d.toISOString().slice(0,10);
+      return {
+        url: iUrl !== -1 ? (r[iUrl]||'') : '',
+        title: iTitle !== -1 ? (r[iTitle]||'') : '',
+        caption: iCaption !== -1 ? (r[iCaption]||'') : '',
+        date: parsedDate,
+        status: status
+      };
+    }).filter(function(p){ return p.title || p.caption || p.url; });
+  }
+
+  var pendingImport = [];
+  document.getElementById('importBtn').addEventListener('click', function(){
+    var text = document.getElementById('importText').value;
+    pendingImport = parseDelimitedText(text);
+    var preview = document.getElementById('importPreview');
+    if(!pendingImport.length){
+      preview.innerHTML = '<p style="font-size:12px;opacity:.7;">Nothing recognisable found — check that you copied the header row along with your data.</p>';
+      return;
+    }
+    var rowsHtml = pendingImport.slice(0,8).map(function(p){
+      return '<div class="post-row"><div class="info"><div class="t">'+(p.title||p.caption||'Untitled')+'</div>' +
+        '<div class="meta">'+p.status+(p.date?' · '+p.date:'')+(p.url?'':' · no image URL yet')+'</div></div></div>';
+    }).join('');
+    preview.innerHTML =
+      '<p style="font-size:12.5px;font-weight:600;">Found '+pendingImport.length+' row'+(pendingImport.length===1?'':'s')+':</p>' +
+      '<div class="post-list">'+rowsHtml+'</div>' +
+      (pendingImport.length > 8 ? '<p style="font-size:11px;opacity:.6;">+ '+(pendingImport.length-8)+' more</p>' : '') +
+      '<div class="btn-row" style="margin-top:10px;"><button class="btn btn-primary" id="confirmImportBtn">Import all '+pendingImport.length+'</button></div>';
+    document.getElementById('confirmImportBtn').addEventListener('click', function(){
+      pendingImport.forEach(function(p){
+        state.posts.push({
+          url: p.url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%23efefef"/></svg>',
+          title: p.title, caption: p.caption, date: p.date, status: p.status
+        });
+      });
+      render(); save(true);
+      document.getElementById('importText').value = '';
+      preview.innerHTML = '<p style="font-size:12px;color:#5a8a5a;">Imported ✓ — check the Post List or Add / Edit tabs to fill in any missing images.</p>';
+    });
+  });
+
+  render();
+  renderHighlights();
+
+  // ---- collapse/expand planner panel ----
+  var collapsible = document.getElementById('panelCollapsible');
+  var toggleBtn = document.getElementById('panelToggleBtn');
+  var PANEL_STATE_KEY = 'ig_grid_panel_collapsed';
+
+  function setPanelState(collapsed){
+    if(collapsed){
+      collapsible.classList.add('collapsed');
+      toggleBtn.textContent = '▾ Show planner';
+    } else {
+      collapsible.classList.remove('collapsed');
+      collapsible.style.maxHeight = collapsible.scrollHeight + 'px';
+      toggleBtn.textContent = '▴ Hide planner';
+    }
+    localStorage.setItem(PANEL_STATE_KEY, collapsed ? '1' : '0');
+  }
+
+  toggleBtn.addEventListener('click', function(){
+    setPanelState(!collapsible.classList.contains('collapsed'));
+  });
+
+  // recalc height whenever tab content changes size (e.g. switching panel tabs)
+  document.querySelectorAll('.panel-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      if(!collapsible.classList.contains('collapsed')){
+        setTimeout(function(){ collapsible.style.maxHeight = collapsible.scrollHeight + 'px'; }, 0);
+      }
+    });
+  });
+
+  setPanelState(localStorage.getItem(PANEL_STATE_KEY) === '1');
+
+  // ---- top bar shortcut icons ----
+  function jumpToPanelTab(tabName){
+    if(collapsible.classList.contains('collapsed')) setPanelState(false);
+    var tabEl = document.querySelector('.panel-tab[data-tab="'+tabName+'"]');
+    if(tabEl) tabEl.click();
+    setTimeout(function(){
+      document.querySelector('.panel').scrollIntoView({behavior:'smooth', block:'start'});
+    }, 50);
+  }
+  document.getElementById('topAddBtn').addEventListener('click', function(){
+    jumpToPanelTab('add');
+    document.getElementById('f-url').focus();
+  });
+  document.getElementById('topMenuBtn').addEventListener('click', function(){
+    jumpToPanelTab('settings');
+  });
+})();
+</script>
+</body>
+</html>
